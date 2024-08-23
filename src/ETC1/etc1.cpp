@@ -244,6 +244,34 @@ inline void take_best(etc_compressed* a, const etc_compressed* b) {
 }
 
 static
+void etc_average_colors_block(const etc1_byte* pIn, etc1_uint32 inMask,
+        etc1_byte* pColors) {
+    int r = 0;
+    int g = 0;
+    int b = 0;
+
+    if (1) {
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 4; x++) {
+                int i = x + 4 * y;
+                if (inMask & (1 << i)) {
+                    const etc1_byte* p = pIn + i * 3;
+                    r += *(p++);
+                    g += *(p++);
+                    b += *(p++);
+                }
+            }
+        }
+    }
+    pColors[0] = (etc1_byte)((r + 8) >> 4);
+    pColors[1] = (etc1_byte)((g + 8) >> 4);
+    pColors[2] = (etc1_byte)((b + 8) >> 4);
+    pColors[3] = pColors[0];
+    pColors[4] = pColors[1];
+    pColors[5] = pColors[2];
+}
+
+static
 void etc_average_colors_subblock(const etc1_byte* pIn, etc1_uint32 inMask,
         etc1_byte* pColors, bool flipped, bool second) {
     int r = 0;
@@ -333,10 +361,20 @@ static etc1_uint32 chooseModifier(const etc1_byte* pBaseColors,
 
 static
 void etc_encode_subblock_helper(const etc1_byte* pIn, etc1_uint32 inMask,
-        etc_compressed* pCompressed, bool flipped, bool second,
+        etc_compressed* pCompressed, bool flipped, bool second, bool bETC1S,
         const etc1_byte* pBaseColors, const int* pModifierTable) {
     int score = pCompressed->score;
-    if (flipped) {
+    if (bETC1S) {
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 4; x++) {
+                int i = x + 4 * y;
+                if (inMask & (1 << i)) {
+                    score += chooseModifier(pBaseColors, pIn + i * 3,
+                            &pCompressed->low, y + x * 4, pModifierTable);
+                }
+            }
+        }
+    } else if (flipped) {
         int by = 0;
         if (second) {
             by = 2;
@@ -427,7 +465,7 @@ static void etc_encodeBaseColors(etc1_byte* pBaseColors,
 
 static
 void etc_encode_block_helper(const etc1_byte* pIn, etc1_uint32 inMask,
-        const etc1_byte* pColors, etc_compressed* pCompressed, bool flipped) {
+        const etc1_byte* pColors, etc_compressed* pCompressed, bool flipped, bool bETC1S) {
     pCompressed->score = ~0;
     pCompressed->high = (flipped ? 1 : 0);
     pCompressed->low = 0;
@@ -443,10 +481,16 @@ void etc_encode_block_helper(const etc1_byte* pIn, etc1_uint32 inMask,
         etc_compressed temp;
         temp.score = 0;
         temp.high = originalHigh | (i << 5);
+        if (bETC1S) {
+            temp.high |= (i << 2);
+        }
         temp.low = 0;
-        etc_encode_subblock_helper(pIn, inMask, &temp, flipped, false,
+        etc_encode_subblock_helper(pIn, inMask, &temp, flipped, false, bETC1S,
                 pBaseColors, pModifierTable);
         take_best(pCompressed, &temp);
+    }
+    if (bETC1S) {
+        return;
     }
     pModifierTable = kModifierTable;
     etc_compressed firstHalf = *pCompressed;
@@ -455,7 +499,7 @@ void etc_encode_block_helper(const etc1_byte* pIn, etc1_uint32 inMask,
         temp.score = firstHalf.score;
         temp.high = firstHalf.high | (i << 2);
         temp.low = firstHalf.low;
-        etc_encode_subblock_helper(pIn, inMask, &temp, flipped, true,
+        etc_encode_subblock_helper(pIn, inMask, &temp, flipped, true, bETC1S,
                 pBaseColors + 3, pModifierTable);
         if (i == 0) {
             *pCompressed = temp;
@@ -478,18 +522,24 @@ static void writeBigEndian(etc1_byte* pOut, etc1_uint32 d) {
 // Output is an ETC1 compressed version of the data.
 
 void etc1_encode_block(const etc1_byte* pIn, etc1_uint32 inMask,
-        etc1_byte* pOut) {
+        etc1_byte* pOut, bool bETC1S) {
     etc1_byte colors[6];
     etc1_byte flippedColors[6];
-    etc_average_colors_subblock(pIn, inMask, colors, false, false);
-    etc_average_colors_subblock(pIn, inMask, colors + 3, false, true);
-    etc_average_colors_subblock(pIn, inMask, flippedColors, true, false);
-    etc_average_colors_subblock(pIn, inMask, flippedColors + 3, true, true);
-
     etc_compressed a, b;
-    etc_encode_block_helper(pIn, inMask, colors, &a, false);
-    etc_encode_block_helper(pIn, inMask, flippedColors, &b, true);
-    take_best(&a, &b);
+
+    if (bETC1S) {
+        etc_average_colors_block(pIn, inMask, colors);
+        etc_encode_block_helper(pIn, inMask, colors, &a, false, bETC1S);
+    } else {
+        etc_average_colors_subblock(pIn, inMask, colors, false, false);
+        etc_average_colors_subblock(pIn, inMask, colors + 3, false, true);
+        etc_average_colors_subblock(pIn, inMask, flippedColors, true, false);
+        etc_average_colors_subblock(pIn, inMask, flippedColors + 3, true, true);
+        etc_encode_block_helper(pIn, inMask, colors, &a, false, bETC1S);
+        etc_encode_block_helper(pIn, inMask, flippedColors, &b, true, bETC1S);
+        take_best(&a, &b);
+    }
+
     writeBigEndian(pOut, a.high);
     writeBigEndian(pOut + 4, a.low);
 }
@@ -506,7 +556,7 @@ etc1_uint32 etc1_get_encoded_data_size(etc1_uint32 width, etc1_uint32 height) {
 // pOut - pointer to encoded data. Must be large enough to store entire encoded image.
 
 int etc1_encode_image(const etc1_byte* pIn, etc1_uint32 width, etc1_uint32 height,
-        etc1_uint32 pixelSize, etc1_uint32 stride, etc1_byte* pOut) {
+        etc1_uint32 pixelSize, etc1_uint32 stride, etc1_byte* pOut, bool bETC1S) {
     if (pixelSize < 2 || pixelSize > 3) {
         return -1;
     }
@@ -546,7 +596,7 @@ int etc1_encode_image(const etc1_byte* pIn, etc1_uint32 width, etc1_uint32 heigh
                     }
                 }
             }
-            etc1_encode_block(block, mask, encoded);
+            etc1_encode_block(block, mask, encoded, bETC1S);
             memcpy(pOut, encoded, sizeof(encoded));
             pOut += sizeof(encoded);
         }

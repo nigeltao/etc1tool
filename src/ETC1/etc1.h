@@ -41,7 +41,7 @@ extern "C" {
 //
 // pOut is an ETC1 compressed version of the data.
 
-void etc1_encode_block(const etc1_byte* pIn, etc1_uint32 validPixelMask, etc1_byte* pOut);
+void etc1_encode_block(const etc1_byte* pIn, etc1_uint32 validPixelMask, etc1_byte* pOut, bool bETC1S);
 
 // Decode a block of pixels.
 //
@@ -65,7 +65,7 @@ etc1_uint32 etc1_get_encoded_data_size(etc1_uint32 width, etc1_uint32 height);
 // returns non-zero if there is an error.
 
 int etc1_encode_image(const etc1_byte* pIn, etc1_uint32 width, etc1_uint32 height,
-        etc1_uint32 pixelSize, etc1_uint32 stride, etc1_byte* pOut);
+        etc1_uint32 pixelSize, etc1_uint32 stride, etc1_byte* pOut, bool bETC1S);
 
 // Decode an entire image.
 // pIn - pointer to encoded data.

@@ -45,6 +45,8 @@ void usage(const char* message, ...) {
     fprintf(stderr, "\t\t--help           print this usage information.\n");
     fprintf(stderr,
             "\t\t--encode         create an ETC1 file from a PNG file.\n");
+    fprintf(stderr,
+            "\t\t--encodeETC1S    create an ETC1S file from a PNG file.\n");
     fprintf(
             stderr,
             "\t\t--encodeNoHeader create a raw ETC1 data file (without a header) from a PNG file.\n");
@@ -310,7 +312,7 @@ int readPKMFile(const char* pInput, etc1_byte** ppImageData,
 // Encode the file.
 // Returns non-zero if an error occurred.
 
-int encode(const char* pInput, const char* pOutput, bool bEmitHeader, const char* pDiffFile) {
+int encode(const char* pInput, const char* pOutput, bool bEmitHeader, bool bETC1S, const char* pDiffFile) {
     FILE* pOut = NULL;
     etc1_uint32 width = 0;
     etc1_uint32 height = 0;
@@ -332,7 +334,7 @@ int encode(const char* pInput, const char* pOutput, bool bEmitHeader, const char
     }
 
     etc1_encode_image(pSourceImage,
-            width, height, 3, width * 3, pEncodedData);
+            width, height, 3, width * 3, pEncodedData, bETC1S);
 
     if ((pOut = fopen(pOutput, "wb")) == NULL) {
         fprintf(stderr, "Could not open output file %s: %d\n", pOutput, errno);
@@ -474,7 +476,7 @@ int decode(const char* pInput, const char* pOutput) {
 
 void multipleEncodeDecodeCheck(bool* pbEncodeDecodeSeen) {
     if (*pbEncodeDecodeSeen) {
-        usage("At most one occurrence of --encode --encodeNoHeader or --decode is allowed.\n");
+        usage("At most one occurrence of --encode --encodeETC1S --encodeNoHeader or --decode is allowed.\n");
     }
     *pbEncodeDecodeSeen = true;
 }
@@ -488,6 +490,7 @@ int main(int argc, char** argv) {
 
     bool bEncodeDecodeSeen = false;
     bool bEncode = false;
+    bool bEncodeETC1S = false;
     bool bEncodeHeader = false;
     bool bShowDifference = false;
 
@@ -509,6 +512,11 @@ int main(int argc, char** argv) {
                 if (strcmp(pArg, "--encode") == 0) {
                     multipleEncodeDecodeCheck(&bEncodeDecodeSeen);
                     bEncode = true;
+                    bEncodeHeader = true;
+                } else if (strcmp(pArg, "--encodeETC1S") == 0) {
+                    multipleEncodeDecodeCheck(&bEncodeDecodeSeen);
+                    bEncode = true;
+                    bEncodeETC1S = true;
                     bEncodeHeader = true;
                 } else if (strcmp(pArg, "--encodeNoHeader") == 0) {
                     multipleEncodeDecodeCheck(&bEncodeDecodeSeen);
@@ -570,7 +578,7 @@ int main(int argc, char** argv) {
     }
 
     if (bEncode) {
-        encode(pInput, pOutput, bEncodeHeader, pDiffFile);
+        encode(pInput, pOutput, bEncodeHeader, bEncodeETC1S, pDiffFile);
     } else {
         decode(pInput, pOutput);
     }
