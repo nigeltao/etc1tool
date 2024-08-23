@@ -14,6 +14,10 @@ Project. The original source file paths within AOSP:
 - `frameworks/native/opengl/include/ETC1/etc1.h`
 - `frameworks/native/opengl/libs/ETC1/etc1.cpp`
 
+## Local Modifications
+
+- Added `mk.sh` simple build script.
+
 ## License
 
 Apache 2.
