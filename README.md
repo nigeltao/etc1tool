@@ -40,6 +40,10 @@ The 4×4 block boundaries are therefore more clearly visible with ETC1S.
 [Basis Universal](https://github.com/BinomialLLC/basis_universal) texture
 compression uses ETC1S (and another format called UASTC, a subset of ASTC).
 
+The benefit of limited ETC1S (instead of full ETC1) is that ETC1S can be easily
+converted at runtime to the BC1 texture compression format (which is also 64
+bits per 4×4 block). Some older graphics systems support BC1 but not ETC1.
+
 ## License
 
 Apache 2.
