@@ -18,6 +18,7 @@ Project. The original source file paths within AOSP:
 
 - Added `--encodeETC1S` flag.
 - Added `mk.sh` simple build script.
+- `PNG_TRANSFORM_EXPAND` bugfix.
 
 ## ETC1S
 

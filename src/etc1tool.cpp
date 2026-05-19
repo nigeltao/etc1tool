@@ -188,9 +188,10 @@ int read_PNG_File(const char* pInput, etc1_byte** ppImageData,
 
     png_init_io(png_ptr, pIn);
     png_set_sig_bytes(png_ptr, PNG_HEADER_SIZE);
-    png_read_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY
-            | PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_STRIP_ALPHA
-            | PNG_TRANSFORM_PACKING, NULL);
+    png_read_png(png_ptr, info_ptr,
+                 PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_STRIP_ALPHA |
+                     PNG_TRANSFORM_EXPAND,
+                 NULL);
 
     row_pointers = png_get_rows(png_ptr, info_ptr);
     {
